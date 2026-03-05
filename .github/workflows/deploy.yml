@@ -1,0 +1,37 @@
+name: Auto-Deploy to GAS
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install CLASP
+        run: npm install -g @google/clasp
+
+      - name: Create .clasp.json
+        run: echo '{"scriptId":"${{ secrets.GAS_PROJECT_ID }}","rootDir":"."}' > .clasp.json
+
+      - name: Login to CLASP using Refresh Token
+        run: |
+          mkdir -p ~/.clasprc
+          cat <<EOF > ~/.clasprc.json
+          {
+            "refreshToken": "${{ secrets.GAS_REFRESH_TOKEN }}",
+            "accessToken": "dummy",
+            "expiryDate": 1,
+            "tokenType": "Bearer"
+          }
+          EOF
+
+      - name: Push to GAS
+        run: clasp push --force
