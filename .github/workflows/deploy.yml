@@ -3,7 +3,7 @@ name: Deploy to Google Apps Script
 on:
   push:
     branches:
-      - main  # 确保这里是你推送的主分支名，如果是 master 请改为 master
+      - main  # 确保这里是你推送到分支的名字，通常是 main 或 master
 
 jobs:
   deploy:
@@ -25,27 +25,36 @@ jobs:
         run: npm install -g @google/clasp
 
       # 4. 创建 .clasp.json 配置文件
-      # 注意：这里从 GitHub Secrets 读取 Script ID
+      # 注意：这里假设你的 GAS_SCRIPT_ID 已经设置在 GitHub Secrets 中
       - name: Create .clasp.json
         run: |
-          echo '{"scriptId": "${{ secrets.GAS_SCRIPT_ID }}", "rootDir": "."}' > .clasp.json
+          echo "{\"scriptId\": \"${{ secrets.GAS_SCRIPT_ID }}\"}" > .clasp.json
 
-      # 5. 【关键步骤】使用服务账号密钥登录 CLASP
-      # 这步会替代之前错误的 "Refresh Token" 登录方式
+      # 5. 【核心修改】登录 CLASP (使用 Heredoc 避免 JSON 格式错误)
       - name: Login to CLASP using Service Account
         run: |
-          # 将 Secret 中的 JSON 写入临时文件
-          echo "${{ secrets.GAS_SERVICE_ACCOUNT_KEY }}" > /tmp/creds.json
-          # 使用该文件登录
-          clasp login --creds /tmp/creds.json
+          # 使用 Heredoc 安全写入 JSON 文件，完全保留换行和特殊字符
+          cat > creds.json <<EOF
+          ${{ secrets.GAS_SERVICE_ACCOUNT_KEY }}
+          EOF
+          
+          # 可选：打印文件前几行用于调试（如果成功部署后建议注释掉，避免泄露）
+          # head -n 5 creds.json 
+          
+          # 执行登录
+          clasp login --creds creds.json
+          
+          # 清理敏感文件
+          rm creds.json
 
-      # 6. 推送代码到 GAS
+      # 6. 推送代码到 Google Apps Script
       - name: Push to GAS
-        run: clasp push --force
+        run: clasp push -f
 
-      # 7. (可选) 如果你需要部署新版本，取消下面注释
-      # - name: Create New Version
-      #   run: clasp version "Auto-deployed version"
-
-      # - name: Deploy
-      #   run: clasp deploy
+      # 7. 部署新版本 (可选，如果你需要自动创建新版本部署)
+      - name: Create Deployment
+        run: |
+          # 获取当前部署 ID (如果有) 或者直接创建新的
+          # 这里简单演示创建一个新的 Web App 部署，版本号为 "HEAD"
+          # 如果你已经有部署，可能需要先 clasp deployments 查看 ID
+          clasp deploy --title "Auto-deploy by GitHub Actions" --description "Automated deployment"
