@@ -1,37 +1,51 @@
-name: Auto-Deploy to GAS
+name: Deploy to Google Apps Script
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main  # 确保这里是你推送的主分支名，如果是 master 请改为 master
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
 
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. 设置 Node.js 环境
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
+      # 3. 安装 CLASP
       - name: Install CLASP
         run: npm install -g @google/clasp
 
+      # 4. 创建 .clasp.json 配置文件
+      # 注意：这里从 GitHub Secrets 读取 Script ID
       - name: Create .clasp.json
-        run: echo '{"scriptId":"${{ secrets.GAS_PROJECT_ID }}","rootDir":"."}' > .clasp.json
-
-      - name: Login to CLASP using Refresh Token
         run: |
-          mkdir -p ~/.clasprc
-          cat <<EOF > ~/.clasprc.json
-          {
-            "refreshToken": "${{ secrets.GAS_REFRESH_TOKEN }}",
-            "accessToken": "dummy",
-            "expiryDate": 1,
-            "tokenType": "Bearer"
-          }
-          EOF
+          echo '{"scriptId": "${{ secrets.GAS_SCRIPT_ID }}", "rootDir": "."}' > .clasp.json
 
+      # 5. 【关键步骤】使用服务账号密钥登录 CLASP
+      # 这步会替代之前错误的 "Refresh Token" 登录方式
+      - name: Login to CLASP using Service Account
+        run: |
+          # 将 Secret 中的 JSON 写入临时文件
+          echo "${{ secrets.GAS_SERVICE_ACCOUNT_KEY }}" > /tmp/creds.json
+          # 使用该文件登录
+          clasp login --creds /tmp/creds.json
+
+      # 6. 推送代码到 GAS
       - name: Push to GAS
         run: clasp push --force
+
+      # 7. (可选) 如果你需要部署新版本，取消下面注释
+      # - name: Create New Version
+      #   run: clasp version "Auto-deployed version"
+
+      # - name: Deploy
+      #   run: clasp deploy

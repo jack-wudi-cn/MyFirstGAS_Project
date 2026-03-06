@@ -1,6 +1,6 @@
 function testBasicOperations() {
   // 1. 获取活跃表格和工作表
-  // from vscode
+  // from vscode test
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   // 安全检查：如果没有打开的表格，直接停止，防止报错
